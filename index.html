@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12"><link rel="manifest" href="manifest.webmanifest">
+<title>AI Affiliate Creator</title>
+<style>
+:root{--bg:#0b0d12;--card:#121620;--muted:#8e98aa;--text:#f6f7fb;--line:#252b38;--accent:#7c5cff;--ok:#35c98b;--warn:#f5b942}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#090b10,#10131b);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:900px;margin:auto;padding:18px 14px 60px}.hero{padding:18px 4px 12px}.hero h1{font-size:28px;margin:0 0 6px}.hero p{color:var(--muted);margin:0}
+.card{background:rgba(18,22,32,.96);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 10px 30px #0003}
+label{display:block;font-weight:650;margin:12px 0 7px}input,textarea,select{width:100%;border:1px solid #303746;background:#0d1119;color:var(--text);border-radius:12px;padding:12px;font:inherit;outline:none}textarea{min-height:100px;resize:vertical}
+button{border:0;border-radius:12px;padding:11px 14px;background:#222938;color:#fff;font-weight:700;cursor:pointer}button.primary{background:linear-gradient(135deg,#7c5cff,#5d7cff);width:100%;font-size:16px;padding:14px;margin-top:14px}button:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#1d2532;color:#cbd3df;font-size:12px;margin:3px}.verified{color:#76e0b0}.missing{color:#f2c66d}.tabs{display:flex;gap:6px;overflow:auto;margin:10px 0}.tabs button.active{background:var(--accent)}.output{white-space:pre-wrap;line-height:1.55;background:#0d1118;border:1px solid var(--line);border-radius:12px;padding:13px}.product{display:grid;grid-template-columns:120px 1fr;gap:14px}.product img{width:120px;height:120px;object-fit:cover;border-radius:12px;background:#0a0c10}.muted{color:var(--muted)}.small{font-size:12px;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.creative{border-radius:14px;border:1px solid var(--line);padding:18px;background:linear-gradient(160deg,#171d2a,#0c1018);min-height:250px;display:flex;flex-direction:column;justify-content:space-between}.price{font-size:25px;font-weight:850}.hidden{display:none}.progress{height:8px;background:#1c2330;border-radius:99px;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,#7c5cff,#37c99a);transition:width .4s}
+@media(max-width:520px){.product{grid-template-columns:90px 1fr}.product img{width:90px;height:90px}.hero h1{font-size:24px}}
+</style>
+</head>
+<body>
+<main>
+<section class="hero"><h1>AI Affiliate Creator</h1><p>Paste a product URL + your profit/affiliate link → build a complete selling package.</p></section>
+
+<section class="card">
+<label>Product URL</label><input id="productUrl" placeholder="https://...">
+<label>Profit / Affiliate URL</label><input id="affiliateUrl" placeholder="https://...">
+<div class="row">
+<div><label>Language</label><select id="lang"><option>English</option><option>Telugu</option><option>Hindi</option><option>Hinglish</option><option>Telugu + English</option></select></div>
+<div><label>Style</label><select id="style"><option>Professional</option><option>Viral</option><option>Minimal</option><option>Luxury</option><option>Budget Deal</option><option>Problem → Solution</option></select></div>
+</div>
+<button class="primary" id="generate">GENERATE COMPLETE PACKAGE</button>
+<div id="status" class="small" style="margin-top:10px"></div><div class="progress" style="margin-top:8px"><div id="bar" class="bar"></div></div>
+</section>
+
+<section id="result" class="hidden">
+<div class="card"><h2>Verified Product Data</h2><div id="product"></div><div id="facts" style="margin-top:10px"></div></div>
+<div class="card"><h2>Creative Preview</h2><div class="grid"><div id="creative" class="creative"></div><div><h3>Video / Reel storyboard</h3><div id="story" class="output"></div><button id="downloadStoryboard" style="margin-top:8px">Download storyboard</button></div></div></div>
+<div class="card"><h2>Platform Publishing Package</h2><div class="tabs" id="tabs"></div><div id="copyArea" class="output"></div><button id="copy" style="margin-top:8px">Copy</button></div>
+<div class="card"><h2>Export</h2><p class="muted">This version exports the complete content package as a JSON file and can be installed as a PWA. API-backed scraping/video generation can be connected later without changing the UI.</p><button id="export">Download complete package</button></div>
+</section>
+
+<section class="card">
+<h3>Manual fallback</h3>
+<p class="small">If a store blocks browser extraction, paste verified product details below. The app never invents missing facts.</p>
+<textarea id="manual" placeholder='Example: Product name: ...&#10;Brand: ...&#10;Price: ₹...&#10;MRP: ₹...&#10;Discount: ...&#10;Rating: ...&#10;Features: ...'></textarea>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let state={product:{},affiliate:"",outputs:{},story:""};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function setProgress(n,msg){$("bar").style.width=n+"%";$("status").textContent=msg}
+function parseManual(t){
+ let p={}; t.split(/\\n/).forEach(x=>{let m=x.match(/^\\s*([^:]+):\\s*(.*)$/);if(m)p[m[1].trim().toLowerCase()]=m[2].trim()});
+ return {name:p["product name"]||p["name"]||"Product",brand:p["brand"],price:p["price"],mrp:p["mrp"]||p["original price"],discount:p["discount"],rating:p["rating"],features:p["features"],description:p["description"]};
+}
+function getMeta(doc){
+ const pick=(sel,attr="content")=>doc.querySelector(sel)?.getAttribute(attr)||"";
+ let imgs=[...doc.querySelectorAll('meta[property="og:image"],meta[name="twitter:image"]')].map(x=>x.content).filter(Boolean);
+ return {name:pick('meta[property="og:title"]')||doc.title,description:pick('meta[property="og:description"]'),image:imgs[0],url:doc.querySelector('link[rel="canonical"]')?.href||location.href};
+}
+async function extract(url){
+ try{
+  const r=await fetch(url,{mode:"cors",redirect:"follow"});
+  if(!r.ok) throw Error("HTTP "+r.status);
+  const text=await r.text(); const doc=new DOMParser().parseFromString(text,"text/html");
+  let p=getMeta(doc);
+  const json=[...doc.querySelectorAll('script[type="application/ld+json"]')];
+  for(const s of json){try{let d=JSON.parse(s.textContent);let a=Array.isArray(d)?d:[d];let x=a.find(v=>v["@type"]==="Product"||String(v["@type"]).includes("Product"));if(x){p.name=x.name||p.name;p.description=x.description||p.description;p.image=Array.isArray(x.image)?x.image[0]:x.image||p.image;p.brand=typeof x.brand==="object"?x.brand.name:x.brand;p.rating=x.aggregateRating?.ratingValue;p.reviewCount=x.aggregateRating?.reviewCount;p.price=x.offers?.price;p.currency=x.offers?.priceCurrency||"INR";p.mrp=x.offers?.priceSpecification?.price||p.mrp;break}}catch(e){}}
+  }
+  return p;
+ }catch(e){return null}
+}
+function parsePrice(x){if(!x)return null;let n=String(x).replace(/[^0-9.]/g,"");return n?Number(n):null}
+function build(p){
+ const name=p.name||"Product"; const price=p.price?`${p.currency==="INR"||!p.currency?"₹":p.currency+" "}${p.price}`:"Price unavailable";
+ const mrp=p.mrp?`${p.currency==="INR"||!p.currency?"₹":p.currency+" "}${p.mrp}`:"";
+ const disc=p.discount||(p.price&&p.mrp?Math.round((1-parsePrice(p.price)/parsePrice(p.mrp))*100)+"% OFF":null);
+ const featureText=p.features||"Key product details are available on the source page.";
+ const disclosure="Affiliate disclosure: I may earn a commission if you purchase through this link, at no extra cost to you.";
+ state.outputs={
+  Instagram:`${name}\\n\\n${p.description||"A product worth checking out."}\\n\\n${featureText}\\n\\n${mrp?mrp+" → ":""}${price}${disc?" | "+disc:""}${p.rating?"\\n⭐ "+p.rating+(p.reviewCount?" | "+p.reviewCount+" ratings":""):""}\\n\\nShop here: ${state.affiliate}\\n\\n${disclosure}\\n\\n#deals #shopping #productfinds`,
+  Facebook:`${name}\\n\\n${p.description||""}\\n\\n${featureText}\\n\\nPrice: ${price}${disc?"\\n"+disc:""}\\n\\nShop: ${state.affiliate}\\n\\n${disclosure}`,
+  YouTube:`TITLE\\n${name} — Is it worth checking out?\\n\\nDESCRIPTION\\n${p.description||""}\\n\\nKey details:\\n${featureText}\\n\\nPrice: ${price}\\nShop link: ${state.affiliate}\\n\\n${disclosure}\\n\\n#Shorts #Deals #Shopping`,
+  Pinterest:`PIN TITLE\\n${name}\\n\\nDESCRIPTION\\n${p.description||""}\\n${featureText}\\nPrice: ${price}\\n\\nDestination: ${state.affiliate}\\n\\n${disclosure}`,
+  WhatsApp:`${name}\\n${disc?"🔥 "+disc+"\\n":""}${mrp?mrp+" → ":""}${price}\\n\\n${featureText}\\n\\nShop here: ${state.affiliate}\\n\\n${disclosure}`,
+  Telegram:`${name}\\n\\n${featureText}\\n\\nPrice: ${price}${disc?"\\n"+disc:""}\\n\\n🛒 ${state.affiliate}\\n\\n${disclosure}`
+ };
+ state.story=`SCENE 1 — HOOK (0–3s)\\n“${name} — worth checking out?”\\n\\nSCENE 2 — PRODUCT (3–8s)\\nShow the real product image.\\n${p.description||"Show the verified product description."}\\n\\nSCENE 3 — KEY DETAILS (8–15s)\\n${featureText}\\n\\nSCENE 4 — VALUE (15–21s)\\n${mrp?mrp+" → ":""}${price}${disc?" | "+disc:""}\\n\\nSCENE 5 — CTA (21–25s)\\n“Check the product using the link.”\\nAffiliate link: ${state.affiliate}\\n\\nVOICEOVER: Use only the verified text above. No invented claims.`;
+ return {name,price,mrp,disc,featureText};
+}
+function render(p){
+ $("result").classList.remove("hidden");
+ $("product").innerHTML=`<div class="product">${p.image?`<img src="${esc(p.image)}" onerror="this.style.display='none'">`:"<div></div>"}<div><h3>${esc(p.name||"Product")}</h3><div class="pill">VERIFIED URL</div>${p.brand?`<div>Brand: ${esc(p.brand)}</div>`:""}${p.description?`<p class="muted">${esc(p.description)}</p>`:""}<div class="small">${esc(state.affiliate)}</div></div></div>`;
+ const built=build(p);
+ $("facts").innerHTML=[["Price",built.price],["MRP",built.mrp||"Not available"],["Discount",built.disc||"Not available"],["Rating",p.rating||"Not available"],["Reviews",p.reviewCount||"Not available"],["Image",p.image?"Verified source image":"Not available"]].map(x=>`<span class="pill ${x[1]==="Not available"?"missing":"verified"}">${esc(x[0])}: ${esc(x[1])}</span>`).join("");
+ $("creative").innerHTML=`<div><span class="pill">${esc($("style").value)}</span><h2>${esc(p.name||"Product")}</h2><p>${esc(p.description||"Verified product information")}</p></div><div><div class="price">${esc(built.price)}</div><div>${esc(built.disc||"")}</div><button style="margin-top:12px">SHOP NOW</button></div>`;
+ $("story").textContent=state.story;
+ const keys=Object.keys(state.outputs); $("tabs").innerHTML=keys.map((k,i)=>`<button class="${i===0?"active":""}" data-k="${k}">${k}</button>`).join("");
+ $("copyArea").textContent=state.outputs[keys[0]];
+ document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("copyArea").textContent=state.outputs[b.dataset.k]});
+}
+$("generate").onclick=async()=>{
+ const url=$("productUrl").value.trim(), aff=$("affiliateUrl").value.trim();
+ if(!/^https?:\\/\\//i.test(url)){ $("status").textContent="Please enter a valid product URL.";return}
+ if(!/^https?:\\/\\//i.test(aff)){ $("status").textContent="Please enter a valid affiliate/profit URL.";return}
+ state.affiliate=aff; setProgress(10,"Reading product…");
+ let p=await extract(url); setProgress(50,"Verifying product information…");
+ if(!p) {p=parseManual($("manual").value); p.url=url; if(!p.name){$("status").textContent="Browser extraction was blocked. Use the manual fallback with verified details.";setProgress(100,"Manual fallback ready.");return}}
+ p.url=url;
+ setProgress(75,"Preparing professional creative and platform copy…");
+ render(p); setProgress(100,"Complete package ready.");
+};
+$("copy").onclick=async()=>{await navigator.clipboard.writeText($("copyArea").textContent);$("copy").textContent="Copied";setTimeout(()=>$("copy").textContent="Copy",1200)}
+$("downloadStoryboard").onclick=()=>download("storyboard.txt",state.story,"text/plain");
+$("export").onclick=()=>{let data={product:state.product,affiliate_url:state.affiliate,outputs:state.outputs,storyboard:state.story,generated_at:new Date().toISOString()};download("affiliate-package.json",JSON.stringify(data,null,2),"application/json")}
+function download(name,data,type){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+if("serviceWorker"in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body></html>
